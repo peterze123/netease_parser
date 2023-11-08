@@ -34,7 +34,7 @@ def create_table(db_params, query):
     # Close cursor and connection
     cursor.close()
     conn.close()
-    print("Table created successfully or already exists.")
+    # print("Table created successfully or already exists.")
     
     
 def query(db_params, query):

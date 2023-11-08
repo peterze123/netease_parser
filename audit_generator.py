@@ -32,7 +32,7 @@ class AuditGenerator():
         self.all_artists_df = get_all_artists_for_name(NETEASE_PROFILE)
         self.seperate_similar_fake_artists(self.all_artists_df)
         
-        print(self.duplicates_df)
+        # print(self.duplicates_df)
     
         
     def get_database_engine(self, db_name):
@@ -47,15 +47,16 @@ class AuditGenerator():
     
     
     def get_all_artist_songs(self) -> None:
-        songs = get_all_artist_songs(ARTIST_NAME, self.artist_id)
+        songs = get_all_artist_songs(ARTIST_NAME, [self.artist_id])
         
         self.audit_df = pd.DataFrame.from_dict(songs)
-        self.audit_df = self.audit_df.rename(columns={"cp": copyright_id})
+        self.audit_df = self.audit_df.rename(columns={"cp":" copyright_id"})
         # self.audit_df = self.audit_df.drop(columns = ["song_json"])
         self.audit_df = self.audit_df.reset_index()
         
-        print(self.audit_df["song_name"])
         print(self.audit_df.columns)
+        quit()
+        print(self.audit_df["song_name"])
         print(self.audit_df["song_url"])
 
     
@@ -183,6 +184,7 @@ class AuditGenerator():
     
 if __name__ == "__main__":
     audit_generator = AuditGenerator(ARTIST_NAME)
+    audit_generator.get_all_artist_songs()
     # audit_generator.generate_audit()
     
         

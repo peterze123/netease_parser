@@ -123,19 +123,17 @@ def catalog_insertion_query(catalog_li, search_term, netease_profile):
 
     # Iterate over the artists and insert each one
     for catalog in catalog_li:
-        print(catalog)
-        quit()
-        song_id = i['song_id']
-        song_name = i['song_name']
-        tns = i['tns']
-        artist_name = i['artist_name']
-        artist_id = i['artist_id']
+        song_id = catalog['song_id']
+        song_name = catalog['song_name']
+        tns = catalog['tns']
+        artist_name = catalog['artist_name']
+        artist_id = catalog['artist_id']
         fee = catalog['fee']
         pop = catalog['pop']
         mst = catalog['mst']
         cp = catalog['cp']
         no = catalog['no']
-        json_string = i['json_string']
+        json_string = catalog['json_string']
 
         # Execute the insert query with the data
         cursor.execute(insert_query, (
