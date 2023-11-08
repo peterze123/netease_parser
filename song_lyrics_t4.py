@@ -1,3 +1,5 @@
+"""Find each songs lyrics"""
+
 import re
 import psycopg2
 import requests, json

@@ -1,3 +1,5 @@
+"""Find all songs for given artist_id from find_artists_t1"""
+
 import psycopg2
 import requests, json
 

@@ -1,3 +1,5 @@
+""" 1. Find the artist's NetEase profiles 
+    2. Find any duplicate or infringement profiles"""
 
 # -*- coding: utf-8 -*-
 import psycopg2

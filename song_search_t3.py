@@ -1,3 +1,5 @@
+"""Find all songs with the same title"""
+
 import psycopg2
 import requests, json
 

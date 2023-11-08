@@ -1,0 +1,1 @@
+"""Search the API for any songs with the same lyrics all the songs in the artists catalog."""
