@@ -84,10 +84,7 @@ def append_trans_artists(data_dict, api_server):
     return data_dict
 
 
-def artists_insertion_query(json_data, search_term, netease_profile, raw_json):
-    # Parse the JSON string into a Python dictionary
-    data = json.loads(json_data)
-
+def artists_insertion_query(data, artist_name, netease_profile, raw_json):
     # Connect to the PostgreSQL database
     conn = psycopg2.connect(**db_params)
     cursor = conn.cursor()
@@ -96,7 +93,6 @@ def artists_insertion_query(json_data, search_term, netease_profile, raw_json):
     insert_query = """
     INSERT INTO artist (
         artist_search_user_profile,
-        search_term,
         artist_name,
         artist_id,
         trans,
@@ -105,12 +101,12 @@ def artists_insertion_query(json_data, search_term, netease_profile, raw_json):
         albumsize,
         mvsize,
         json_string
-    ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+    ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
     ON CONFLICT (artist_id) DO NOTHING;
     """
 
-    # Prepare data for insertion (assuming the search_term and artist_search_user_profile are known)
-    search_term = search_term
+    # Prepare data for insertion (assuming the artist_name and artist_search_user_profile are known)
+    artist_name = artist_name
     artist_search_user_profile = netease_profile
     artistcount = data['artistcount']
     hlwords = json.dumps(data['hlWords'], ensure_ascii=False)  # Convert the list of words to JSON string
@@ -126,7 +122,6 @@ def artists_insertion_query(json_data, search_term, netease_profile, raw_json):
         # Execute the insert query with the data
         cursor.execute(insert_query, (
             artist_search_user_profile,
-            search_term,
             artist_name,
             artist_id,
             trans,
@@ -150,7 +145,7 @@ if __name__ == '__main__':
         """
             CREATE TABLE IF NOT EXISTS artist (
                 artist_search_user_profile TEXT,
-                search_term TEXT,
+                artist_name TEXT,
                 artist_name TEXT,
                 artist_id BIGINT PRIMARY KEY,
                 trans TEXT,
@@ -163,17 +158,15 @@ if __name__ == '__main__':
         """
     )
     
-    search_term, raw_json = get_artist_json_from_link(NETEASE_PROFILE, API_HOST)
+    artist_name, raw_json = get_artist_json_from_link(NETEASE_PROFILE, API_HOST)
 
     # cleaned version
     cleaned_dict = artist_json_clean(raw_json)
     cleaned_dict = append_trans_artists(cleaned_dict, API_HOST)
-    print(cleaned_dict)
-    quit()
 
-    print(cleaned_json)
+    print(cleaned_dict)
     
     # injection into postgres
-    artists_insertion_query(cleaned_json, search_term, NETEASE_PROFILE, raw_json)
+    artists_insertion_query(cleaned_dict, artist_name, NETEASE_PROFILE, raw_json)
     
     print("task 1 complete")
