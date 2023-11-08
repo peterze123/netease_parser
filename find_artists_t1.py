@@ -1,15 +1,20 @@
-""" 1. Find the artist's NetEase profiles 
-    2. Find any duplicate or infringement profiles"""
+""" 
+1. Find the artist's NetEase profiles 
+2. Find any duplicate or infringement profiles
+
+Writes all artists with given or similar name to db"""
 
 # -*- coding: utf-8 -*-
 import psycopg2
 import requests, json
+import pandas as pd
 
 from misc import create_table, get_id_from_netease_url, db_params, API_HOST, NETEASE_PROFILE
 
 NETEASE_PROFILE = 'https://music.163.com/#/artist?id=185871'
 
 def get_artist_json_from_name(name, api_server) -> dict:
+    """Get all artists for given name. Also includes similar rtists"""
     # access the actual route
     path = '/'.join([api_server, 'search?keywords=' + name + '&type=100']) #type100 = search for artist
     
@@ -66,7 +71,7 @@ def artist_json_clean(data) -> dict:
 
 
 def append_trans_artists(data_dict, api_server):
-    """If any artists has trans set request the artist page for this artist and add it to the artists field"""
+    """If any artists has a translation set request the artist page for this artist and add it to the artists field"""
     for artist in data_dict['artists']:
         if artist["trans"] is not None:
             try:
@@ -93,6 +98,7 @@ def artists_insertion_query(data, artist_name, netease_profile, raw_json):
     insert_query = """
     INSERT INTO artist (
         artist_search_user_profile,
+        search_term,
         artist_name,
         artist_id,
         trans,
@@ -101,7 +107,7 @@ def artists_insertion_query(data, artist_name, netease_profile, raw_json):
         albumsize,
         mvsize,
         json_string
-    ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
+    ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
     ON CONFLICT (artist_id) DO NOTHING;
     """
 
@@ -123,6 +129,7 @@ def artists_insertion_query(data, artist_name, netease_profile, raw_json):
         cursor.execute(insert_query, (
             artist_search_user_profile,
             artist_name,
+            artist_name,
             artist_id,
             trans,
             artistcount,
@@ -140,12 +147,12 @@ def artists_insertion_query(data, artist_name, netease_profile, raw_json):
     conn.close()
 
 
-if __name__ == '__main__':
-    create_table(db_params,
+def create_t1_table():
+        create_table(db_params,
         """
             CREATE TABLE IF NOT EXISTS artist (
                 artist_search_user_profile TEXT,
-                artist_name TEXT,
+                search_term TEXT,
                 artist_name TEXT,
                 artist_id BIGINT PRIMARY KEY,
                 trans TEXT,
@@ -157,16 +164,27 @@ if __name__ == '__main__':
             );
         """
     )
-    
+
+
+def get_all_artists_for_name() -> pd.DataFrame:
+    create_t1_table()
     artist_name, raw_json = get_artist_json_from_link(NETEASE_PROFILE, API_HOST)
 
     # cleaned version
     cleaned_dict = artist_json_clean(raw_json)
     cleaned_dict = append_trans_artists(cleaned_dict, API_HOST)
 
-    print(cleaned_dict)
+    artists_df = pd.DataFrame().from_dict(cleaned_dict["artists"])
+    print(artists_df)
     
     # injection into postgres
     artists_insertion_query(cleaned_dict, artist_name, NETEASE_PROFILE, raw_json)
-    
     print("task 1 complete")
+
+    return artists_df 
+
+
+if __name__ == '__main__':
+    get_all_artists_for_name()
+    
+    
