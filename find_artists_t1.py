@@ -5,22 +5,25 @@
 import psycopg2
 import requests, json
 
-from misc import create_table, get_id_from_netease_url, db_params, api_host, netease_profile
+from misc import create_table, get_id_from_netease_url, db_params, API_HOST, NETEASE_PROFILE
 
-def get_artist_json_from_name(name, parent_path):
+NETEASE_PROFILE = 'https://music.163.com/#/artist?id=185871'
+
+def get_artist_json_from_name(name, api_server) -> dict:
     # access the actual route
-    path = '/'.join([parent_path, 'search?keywords=' + name + '&type=100'])
+    path = '/'.join([api_server, 'search?keywords=' + name + '&type=100']) #type100 = search for artist
     
-    result= requests.get(path)
+    result = requests.get(path)
     result.raise_for_status()  # Will raise an HTTPError if the HTTP request returned an unsuccessful status code
     
     return result.json()
 
-def get_artist_json_from_link(profile_link, parent_path):
-    # find clear artist id from the actual link string
+
+def get_artist_json_from_link(profile_link, api_server):
+    """find clear artist id from the actual link string"""
     artist_id = get_id_from_netease_url(profile_link)
-    # find the correc path
-    path = '/'.join([parent_path, 'artists?id=' + artist_id])
+    # find the correct path
+    path = '/'.join([api_server, 'artists?id=' + artist_id])
     # access the artist-name search route
     try:
         response = requests.get(path)
@@ -29,14 +32,15 @@ def get_artist_json_from_link(profile_link, parent_path):
         # find the exact artist name
         artist_name = response.json()["artist"]["name"]
         
-        return artist_name, get_artist_json_from_name(artist_name, parent_path)
+        return artist_name, get_artist_json_from_name(artist_name, api_server)
         
     except requests.exceptions.HTTPError as http_err:
         raise Exception(f"HTTP error occurred: {http_err}")  # HTTP error
     except requests.exceptions.RequestException as err:
         raise Exception(f"Error fetching profile: {err}")  # Other request issues
 
-def artist_json_clean(data):
+
+def artist_json_clean(data) -> dict:
     # Prepare a container for cleaned data
     cleaned_data = {
         "artistcount": data['result']['artistCount'],
@@ -56,27 +60,29 @@ def artist_json_clean(data):
         cleaned_data["artists"].append(artist_info)
         
     # Convert cleaned data back to JSON string if necessary
-    cleaned_json = json.dumps(cleaned_data, indent=2,  ensure_ascii=False)
+    # cleaned_json = json.dumps(cleaned_data, indent=2,  ensure_ascii=False)
     
-    return cleaned_json
+    return cleaned_data
 
-def append_trans_artists(raw_data, parent_path):
-    output_data = json.loads(raw_data)
-    data = json.loads(raw_data)
-    
-    for artist in data['artists']:
+
+def append_trans_artists(data_dict, api_server):
+    """If any artists has trans set request the artist page for this artist and add it to the artists field"""
+    for artist in data_dict['artists']:
         if artist["trans"] is not None:
             try:
-                raw_json = get_artist_json_from_name(artist["trans"], parent_path)
+                #request trans artist
+                raw_json = get_artist_json_from_name(artist["trans"], api_server)
             except requests.exceptions.HTTPError as http_err:
                 raise Exception(f"HTTP error occurred: {http_err}")  # HTTP error
             except requests.exceptions.RequestException as err:
                 raise Exception(f"Error fetching profile: {err}")  # Other request issues
             
-            cleaned_json = artist_json_clean(raw_json)
-            output_data['artists'] += json.loads(cleaned_json)['artists']
+            cleaned_dict = artist_json_clean(raw_json)
+            data_dict['artists'] += cleaned_dict['artists']
             
-    return json.dumps(output_data, indent=2,  ensure_ascii=False)
+    # return json.dumps(output_data, indent=2,  ensure_ascii=False)
+    return data_dict
+
 
 def artists_insertion_query(json_data, search_term, netease_profile, raw_json):
     # Parse the JSON string into a Python dictionary
@@ -157,15 +163,17 @@ if __name__ == '__main__':
         """
     )
     
-    search_term, raw_json = get_artist_json_from_link(netease_profile, api_host)
-    
+    search_term, raw_json = get_artist_json_from_link(NETEASE_PROFILE, API_HOST)
+
     # cleaned version
-    cleaned_json = artist_json_clean(raw_json)
-    cleaned_json = append_trans_artists(cleaned_json, api_host)
+    cleaned_dict = artist_json_clean(raw_json)
+    cleaned_dict = append_trans_artists(cleaned_dict, API_HOST)
+    print(cleaned_dict)
+    quit()
 
     print(cleaned_json)
     
     # injection into postgres
-    artists_insertion_query(cleaned_json, search_term, netease_profile, raw_json)
+    artists_insertion_query(cleaned_json, search_term, NETEASE_PROFILE, raw_json)
     
     print("task 1 complete")

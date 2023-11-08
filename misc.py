@@ -1,3 +1,5 @@
+"""library for audit"""
+
 from lxml.html import fromstring
 import requests, json, psycopg2
 
@@ -10,11 +12,12 @@ db_params = {
     'port': '5432'
 }
 
-api_host = 'http://18.119.235.232:3000'
-netease_profile = 'https://music.163.com/#/artist?id=185871'
+API_HOST = 'http://18.119.235.232:3000'
+NETEASE_PROFILE = 'https://music.163.com/#/artist?id=185871'
 
-# table creation functions
+
 def create_table(db_params, query):
+    """table creation functions"""
     # Establish a connection to the database
     conn = psycopg2.connect(**db_params)
     cursor = conn.cursor()
@@ -33,8 +36,9 @@ def create_table(db_params, query):
     conn.close()
     print("Table created successfully or already exists.")
     
+    
 def query(db_params, query):
-    # Establish a connection to the database
+    """Establish a connection to the database"""
     conn = psycopg2.connect(**db_params)
     cursor = conn.cursor()
 
@@ -45,7 +49,7 @@ def query(db_params, query):
     
     return result
 
-# misc functions
+
 def get_artist_name_from_xpath(profile_link):
     try:
         response = requests.get(profile_link)
@@ -72,17 +76,21 @@ def get_artist_name_from_xpath(profile_link):
     except ValueError as ve:
         raise Exception(f"Profile parsing issue: {ve}")  # Parsing issues
 
-# get id= from netease urls
+
 def get_id_from_netease_url(url):
-     # Split the URL by '/'
-    parts = url.split('?')
-    # The fragment will be after the last '/', split the fragment if it exists
-    fragment = parts[-1] 
-    # Split the fragment by '&' in case there are multiple parameters
-    params = fragment.split('&')
+    """get id= from netease urls
+        The fragment will be after the last '/', split the fragment if it exists
+        Split the fragment by '&' in case there are multiple parameters"""
+    params = url.split('?')[-1].split('&')
+    
     for param in params:
         # Split each parameter by '=' to separate the key and value
         key_value = param.split('=')
         if key_value[0] == 'id':
             return key_value[1]
     return None
+
+
+if __name__ == "__main__":
+    pass
+    
