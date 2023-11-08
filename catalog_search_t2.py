@@ -1,9 +1,11 @@
 """Find all songs for given artist_id from find_artists_t1"""
 
+import pandas as pd
 import psycopg2
 import requests, json
 
-from misc import create_table, db_params, api_host, netease_profile
+from misc import create_table, db_params, API_HOST, NETEASE_PROFILE
+
 
 def query_artist_ids():
     # Connect to the PostgreSQL database
@@ -29,12 +31,13 @@ def query_artist_ids():
         cursor.close()
         conn.close()
 
-def get_song_size(artist_id, parent_path):
+
+def get_song_size(artist_id, api_url):
     try:
         # make a request to the songs route to find total songs
-        path = '/'.join([parent_path, 'artist/songs?id=' + str(artist_id)])
+        path = '/'.join([api_url, 'artist/songs?id=' + str(artist_id)])
         
-        result= requests.get(path)
+        result = requests.get(path)
         result.raise_for_status()  # Will raise an HTTPError if the HTTP request returned an unsuccessful status code
         
         return path, int(result.json()["total"])
@@ -44,7 +47,8 @@ def get_song_size(artist_id, parent_path):
     except requests.exceptions.RequestException as err:
         raise Exception(f"Error fetching profile: {err}")  # Other request issues
 
-def get_catalog_json(offset, parent_path):
+
+def get_catalog_dict(offset, parent_path) -> dict:
     try:
         # make a request to the songs route to find total songs
         path = '&'.join([parent_path, 'offset=' + str(offset) + '&limit=100'])
@@ -60,11 +64,11 @@ def get_catalog_json(offset, parent_path):
         raise Exception(f"Error fetching profile: {err}")  # Other request issues
 
     
-def catalog_json_clean(data):
+def catalog_clean(data: dict) -> list[dict]:
     
     extracted_data = []
     
-    # Loop through each song in the JSON data
+    # Loop through each song in the data dict
     for song in data['songs']:
         # Each song has a list of artists, loop through each one
         for artist in song.get('ar', []):
@@ -87,8 +91,8 @@ def catalog_json_clean(data):
             
     return extracted_data
     
+    
 def catalog_insertion_query(catalog_li, search_term, netease_profile):
-
     # Connect to the PostgreSQL database
     conn = psycopg2.connect(**db_params)
     cursor = conn.cursor()
@@ -118,17 +122,19 @@ def catalog_insertion_query(catalog_li, search_term, netease_profile):
     artist_search_user_profile = netease_profile
 
     # Iterate over the artists and insert each one
-    for i in catalog_li:
+    for catalog in catalog_li:
+        print(catalog)
+        quit()
         song_id = i['song_id']
         song_name = i['song_name']
         tns = i['tns']
         artist_name = i['artist_name']
         artist_id = i['artist_id']
-        fee = i['fee']
-        pop = i['pop']
-        mst = i['mst']
-        cp = i['cp']
-        no = i['no']
+        fee = catalog['fee']
+        pop = catalog['pop']
+        mst = catalog['mst']
+        cp = catalog['cp']
+        no = catalog['no']
         json_string = i['json_string']
 
         # Execute the insert query with the data
@@ -154,8 +160,9 @@ def catalog_insertion_query(catalog_li, search_term, netease_profile):
     # Close the cursor and the connection
     cursor.close()
     conn.close()
+
     
-if __name__ == '__main__':
+def create_t2_table():#
     create_table(db_params,
         """
             CREATE TABLE IF NOT EXISTS catalog (
@@ -175,24 +182,38 @@ if __name__ == '__main__':
             );
         """
     )
-    
-    search_term, artist_ids = query_artist_ids()
-    
+
+
+def get_all_artist_songs(search_term, artist_ids):
+    create_t2_table()
     cleaned_catalog_list = []
     
-    for i in artist_ids:
-        path, size = get_song_size(i, api_host)
+    for artist_id in artist_ids:
+        path, size = get_song_size(artist_id, API_HOST)
         # access the catalogs
         counter = 0
         
+        #TODO: better use pagination
         while counter < size + 100:
-            raw_data = get_catalog_json(counter, path)
-            cleaned_catalog_list += catalog_json_clean(raw_data)
-            
+            data_dict = get_catalog_dict(counter, path)
+            cleaned_catalog_list += catalog_clean(data_dict)
+
             counter += 100
             
     
+    catalog_df = pd.DataFrame.from_dict(cleaned_catalog_list)
+    # print(cleaned_catalog_list[:10])
+    catalog_df = catalog_df.drop(columns=["json_string"])
+    
     # injection into postgres
-    catalog_insertion_query(cleaned_catalog_list, search_term, netease_profile)
+    catalog_insertion_query(cleaned_catalog_list, search_term, NETEASE_PROFILE)
     
     print("task 2 complete")
+    return catalog_df
+    
+
+if __name__ == '__main__':
+    # search_term, artist_ids = query_artist_ids()
+    search_term, artist_ids = "Porter Robinson", [185871]
+    get_all_artist_songs(search_term, artist_ids)
+    

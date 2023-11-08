@@ -166,25 +166,25 @@ def create_t1_table():
     )
 
 
-def get_all_artists_for_name() -> pd.DataFrame:
+def get_all_artists_for_name(profile) -> pd.DataFrame:
     create_t1_table()
-    artist_name, raw_json = get_artist_json_from_link(NETEASE_PROFILE, API_HOST)
+    artist_name, raw_json = get_artist_json_from_link(profile, API_HOST)
 
     # cleaned version
     cleaned_dict = artist_json_clean(raw_json)
     cleaned_dict = append_trans_artists(cleaned_dict, API_HOST)
 
     artists_df = pd.DataFrame().from_dict(cleaned_dict["artists"])
-    print(artists_df)
+    # print(artists_df)
     
     # injection into postgres
-    artists_insertion_query(cleaned_dict, artist_name, NETEASE_PROFILE, raw_json)
+    artists_insertion_query(cleaned_dict, artist_name, profile, raw_json)
     print("task 1 complete")
 
     return artists_df 
 
 
 if __name__ == '__main__':
-    get_all_artists_for_name()
+    get_all_artists_for_name(NETEASE_PROFILE)
     
     

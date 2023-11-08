@@ -5,8 +5,15 @@ import boto3
 from sqlalchemy import create_engine
 import sqlalchemy
 
+from find_artists_t1 import get_all_artists_for_name
+from catalog_search_t2 import get_all_artist_songs
+
+
 ARTIST_NAME = "Porter Robinson"
 ARTIST_ID = 185871
+
+API_HOST = 'http://18.119.235.232:3000'
+NETEASE_PROFILE = 'https://music.163.com/#/artist?id=185871'
 
 #https://music.163.com/#/artist?id=185871
 ARTIST_NAME = ARTIST_NAME.lower()
@@ -21,6 +28,11 @@ class AuditGenerator():
         self.duplicates_df = None
         self.db_engines = {}
         self.ssm_client = boto3.client('ssm')
+        
+        self.all_artists_df = get_all_artists_for_name(NETEASE_PROFILE)
+        self.seperate_similar_fake_artists(self.all_artists_df)
+        
+        print(self.duplicates_df)
     
         
     def get_database_engine(self, db_name):
@@ -34,12 +46,21 @@ class AuditGenerator():
         return self.db_engines[db_name]
     
     
-    def get_all_artist_songs(self):
-        pass
+    def get_all_artist_songs(self) -> None:
+        songs = get_all_artist_songs(ARTIST_NAME, self.artist_id)
+        
+        self.audit_df = pd.DataFrame.from_dict(songs)
+        self.audit_df = self.audit_df.rename(columns={"cp": copyright_id})
+        # self.audit_df = self.audit_df.drop(columns = ["song_json"])
+        self.audit_df = self.audit_df.reset_index()
+        
+        print(self.audit_df["song_name"])
+        print(self.audit_df.columns)
+        print(self.audit_df["song_url"])
+
     
-    
-    def seperate_similar_fake_artists(self):
-        self.duplicates_df = self.audit_df[self.audit_df["artist_id"] != self.artist_id]
+    def seperate_similar_fake_artists(self, all_artists_df):
+        self.duplicates_df = all_artists_df[all_artists_df["artist_id"] != self.artist_id]
     
     
     def replace_major_labels(self):
@@ -162,6 +183,6 @@ class AuditGenerator():
     
 if __name__ == "__main__":
     audit_generator = AuditGenerator(ARTIST_NAME)
-    audit_generator.generate_audit()
+    # audit_generator.generate_audit()
     
         
