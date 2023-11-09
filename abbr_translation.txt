@@ -16,3 +16,4 @@ crbt = ?
 cf = ?
 dt = ?
 h = ?
+mvsize = movic video size

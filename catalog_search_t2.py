@@ -84,6 +84,7 @@ def catalog_clean(data: dict) -> list[dict]:
                 'mst': song.get('mst'),
                 'cp': song.get('cp'),
                 'no': song.get('no'),
+                "album_id": song["al"]["id"],
                 'json_string': data
             }
             # Add this song's info to our list
@@ -200,11 +201,10 @@ def get_all_artist_songs(search_term, artist_ids):
             
     
     catalog_df = pd.DataFrame.from_dict(cleaned_catalog_list)
-    # print(cleaned_catalog_list[:10])
     catalog_df = catalog_df.drop(columns=["json_string"])
-    
+
     # injection into postgres
-    catalog_insertion_query(cleaned_catalog_list, search_term, NETEASE_PROFILE)
+    # catalog_insertion_query(cleaned_catalog_list, search_term, NETEASE_PROFILE)
     
     print("task 2 complete")
     return catalog_df

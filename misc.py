@@ -2,6 +2,7 @@
 
 from lxml.html import fromstring
 import requests, json, psycopg2
+from typing import Iterable
 
 # Replace these variables with your database credentials
 db_params = {
@@ -77,6 +78,40 @@ def get_artist_name_from_xpath(profile_link):
         raise Exception(f"Profile parsing issue: {ve}")  # Parsing issues
 
 
+def get_song_details(song_ids: Iterable) -> dict:
+    song_ids_string = ",".join(song_ids)
+    url_song_api = f"{API_HOST}/song/detail?ids={song_ids_string}"
+    response = requests.get(url_song_api)
+    response.raise_for_status()
+    
+    return response.json()
+
+
+def get_album_details(album_id) -> dict:
+    url_album_api = f"{API_HOST}/album?id={album_id}"
+    response = requests.get(url_album_api)
+    response.raise_for_status()
+    
+    return response.json()
+
+
+def get_follower_count(artist_id) -> int:
+    url_album_api = f"{API_HOST}/artist/follow/count?id={artist_id}"
+    response = requests.get(url_album_api)
+    response.raise_for_status()
+    
+    return response.json()["data"]["fansCnt"]
+
+
+def get_comments(song_id, limit=1):
+    url_comment_api = f"{API_HOST}/comment/event?threadId=R_SO_4_{song_id}&limit={limit}"
+    
+    response = requests.get(url_comment_api)
+    response.raise_for_status()
+
+    return response.json()
+
+
 def get_id_from_netease_url(url):
     """get id= from netease urls
         The fragment will be after the last '/', split the fragment if it exists
@@ -92,5 +127,6 @@ def get_id_from_netease_url(url):
 
 
 if __name__ == "__main__":
+    get_comments(347230)
     pass
     

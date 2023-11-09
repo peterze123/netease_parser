@@ -3,20 +3,29 @@
 import pandas as pd
 import boto3
 from sqlalchemy import create_engine
-import sqlalchemy
+import time
+import math
+import datetime
 
+from tqdm import tqdm
+from misc import get_album_details, get_song_details, get_comments, get_follower_count
 from find_artists_t1 import get_all_artists_for_name
 from catalog_search_t2 import get_all_artist_songs
 
+import warnings
+from pandas.errors import SettingWithCopyWarning
 
-ARTIST_NAME = "Porter Robinson"
-ARTIST_ID = 185871
+
+ARTIST_NAME = "Mac Miller"
+ARTIST_ID = 39884
 
 API_HOST = 'http://18.119.235.232:3000'
 NETEASE_PROFILE = 'https://music.163.com/#/artist?id=185871'
 
 #https://music.163.com/#/artist?id=185871
 ARTIST_NAME = ARTIST_NAME.lower()
+#ignore the profile link generation error
+warnings.simplefilter(action="ignore", category=SettingWithCopyWarning)
 
 
 class AuditGenerator():
@@ -34,7 +43,7 @@ class AuditGenerator():
         
         # print(self.duplicates_df)
     
-        
+
     def get_database_engine(self, db_name):
         if db_name not in self.db_engines:
             db_params_dict = self.ssm_client.get_parameters(Names=["db_host", "db_pw"])
@@ -47,23 +56,45 @@ class AuditGenerator():
     
     
     def get_all_artist_songs(self) -> None:
-        songs = get_all_artist_songs(ARTIST_NAME, [self.artist_id])
+        songs = get_all_artist_songs(ARTIST_NAME, [self.artist_id])[:5]
+        # songs = get_all_artist_songs(ARTIST_NAME, [self.artist_id])
         
         self.audit_df = pd.DataFrame.from_dict(songs)
-        self.audit_df = self.audit_df.rename(columns={"cp":" copyright_id"})
-        # self.audit_df = self.audit_df.drop(columns = ["song_json"])
+        self.audit_df = self.audit_df.rename(columns={"cp":"copyright_id", "pop": "popularity"})
+        self.audit_df = self.audit_df.drop(columns = ["tns", "mst", "no"])
         self.audit_df = self.audit_df.reset_index()
         
-        print(self.audit_df.columns)
-        quit()
-        print(self.audit_df["song_name"])
-        print(self.audit_df["song_url"])
-
+        self.audit_df["song_url"] = self.audit_df.apply(lambda x: "https://music.163.com/#/song?id=" + str(x["song_id"]), axis=1)
+        self.audit_df["scrape_time"] = datetime.datetime.now().strftime('%Y-%m-%d')
+        
     
     def seperate_similar_fake_artists(self, all_artists_df):
-        self.duplicates_df = all_artists_df[all_artists_df["artist_id"] != self.artist_id]
+        # self.duplicates_df = all_artists_df[all_artists_df["artist_id"] != self.artist_id]
+        self.duplicates_df = all_artists_df.copy()
+        
+        self.duplicates_df["Platform"] = "Netease"
+        self.duplicates_df["Type"] = ""
+        self.duplicates_df["Notes"] = ""
+        self.duplicates_df["Profile Link"] = "https://music.163.com/#/artist?id=" + self.duplicates_df["artist_id"].astype(str)
+        
+        self.duplicates_df = self.duplicates_df.rename(columns={"artist_name": "Profile Name"})
+        self.duplicates_df = self.duplicates_df.drop(columns=["albumsize", "mvsize", "trans"])
+         
     
-    
+    def convert_time_to_date(self, song_unixtime):
+        try:
+            if song_unixtime >= 0:
+                release_date = datetime.datetime.utcfromtimestamp(song_unixtime).strftime('%Y-%m-%d')
+            elif song_unixtime < 0:
+                release_date = (datetime.datetime(1970, 1, 1) + datetime.timedelta(seconds=(song_unixtime))).strftime('%Y-%m-%d')
+        except Exception as e:
+            print(e)
+            print(song_unixtime)
+            release_date = "1900-1-1"
+            
+        return release_date
+                
+                
     def replace_major_labels(self):
         """Replace the chinese label names with western label names for major labels"""
         #load csv file
@@ -71,25 +102,59 @@ class AuditGenerator():
         for i, chinese_label in enumerate(major_labels_df["c_label"]):
             self.audit_df["company"] = self.audit_df["company"].str.replace(chinese_label,
                                                                              chinese_label + " - " + major_labels_df.iloc[i]["w_label"])
-            
-            
-    def enrich_audit_df(self):
-        """Add comment_count, album_name, release_date to the dataframe"""
-        #TODO: more speed!!!
-        self.audit_df["comment_count"] = "N/A"
-        self.audit_df["album_name"] = "N/A"
-        self.audit_df["release_date"] = "N/A"
         
-        for row_number in range(len(self.audit_df.index)):
-            result_tuple = scrape_song_url(row_number, self.audit_df)
             
-            self.audit_df.at[row_number, "comment_count"] = result_tuple[0]
-            self.audit_df.at[row_number, "album_name"] = result_tuple[1]
-            self.audit_df.at[row_number, "release_date"] = result_tuple[2]
+    def add_folower_count(self) -> None:
+        for artist_id in self.duplicates_df["artist_id"].to_list():
+            follower_count = get_follower_count(artist_id)
+            self.duplicates_df.loc[self.all_artists_df.artist_id == artist_id, 'follower_count'] = follower_count
             
-        print(self.audit_df)
+        self.duplicates_df = self.duplicates_df.drop(columns=["artist_id"])
+            
+    
+    def add_album_details(self) -> None:
+        album_set = set(self.audit_df["album_id"].to_list()) - {0} 
         
+        albums_dict = {}
+        for album_id in tqdm(album_set):
+            if album_id not in albums_dict:
+                albums_dict[album_id] = {}
+                
+            album_dict = get_album_details(album_id)
+            albums_dict[album_id]["album_name"] = album_dict["album"]["name"]
+            albums_dict[album_id]["company"] = album_dict["album"]["company"]
+            albums_dict[album_id]["realease_date"] = self.convert_time_to_date(album_dict["album"]["publishTime"]/1000)
 
+        for album_id in album_set:
+            self.audit_df.loc[self.audit_df.album_id == album_id, 'album_name'] = albums_dict[album_id]["album_name"]
+            self.audit_df.loc[self.audit_df.album_id == album_id, 'company'] = albums_dict[album_id]["company"]
+            self.audit_df.loc[self.audit_df.album_id == album_id, 'realease_date'] = albums_dict[album_id]["realease_date"]
+            
+    
+    def add_artists_and_comments_to_songs(self) -> None:
+        #TODO: test speed improvement with threading
+        song_set = set(self.audit_df["song_id"].astype(str).to_list())
+        songs_dict = {}
+        
+        for song in tqdm(get_song_details(song_set)["songs"]):
+            song_id = song["id"]
+            artists = [(artist["id"], artist["name"])  for artist in song["ar"]]
+            comment_count = get_comments(song_id)["total"]
+            songs_dict[song_id] = {"comment_count": comment_count, "artists": artists} 
+        
+        self.audit_df["comment_count"] = 0
+        self.audit_df["artists"] = None
+        
+        for song_id in songs_dict:
+            self.audit_df.loc[self.audit_df.song_id == song_id, 'comment_count'] = songs_dict[song_id]["comment_count"]
+            
+            artists_str = ", ".join([x[1] for x in songs_dict[song_id]["artists"]])
+            self.audit_df.loc[self.audit_df.song_id == song_id, 'artists'] = artists_str
+            
+        # print(self.audit_df["comment_count"])
+        # print(self.audit_df["artists"])
+            
+            
     def upload_audit_to_s3(self):
         pass
         
@@ -129,9 +194,11 @@ class AuditGenerator():
     def save_audit_as_xlsx(self):
         writer = pd.ExcelWriter("artist_audit.xlsx", engine = 'xlsxwriter')
         self.audit_df.to_excel(writer, index=True, sheet_name = "NetEase Raw")
-        self.duplicates_df.to_excel(writer, index=True, sheet_name = "Duplicate Profile Accounts")
+        self.duplicates_df.to_excel(writer, index=True, sheet_name = "Profile Search")
         writer.close()
         
+        
+    def coloring_rows(self):
         copyright_ids_df = pd.read_csv("copyright_ids_netease.csv")
         red_copyrights = copyright_ids_df["Red"].to_list()
         # yellow_copyrights = copyright_ids_df["Yellow"].to_list()
@@ -171,20 +238,24 @@ class AuditGenerator():
         
     def generate_audit(self):
         self.get_all_artist_songs()
-        self.seperate_similar_fake_artists()
-        self.enrich_audit_df()
+        self.add_album_details()
+        self.add_artists_and_comments_to_songs()
         self.replace_major_labels()
+        self.add_folower_count()
         self.audit_df["royalties"] = self.audit_df.apply(lambda x: self.estimated_royalties(x["comment_count"]), axis=1)
         self.coloring_rows()
         self.save_audit_as_xlsx()
-        self.copy_audit_to_s3()
+        # self.audit_df = self.audit_df.drop(columns=["copyright_color"])
+        self.upload_audit_to_s3()
         
         print(self.audit_df)
     
     
 if __name__ == "__main__":
+    start_time = time.time()
     audit_generator = AuditGenerator(ARTIST_NAME)
-    audit_generator.get_all_artist_songs()
-    # audit_generator.generate_audit()
+    # audit_generator.get_all_artist_songs()
+    audit_generator.generate_audit()
     
-        
+    print("time:", time.time() - start_time)
+    
