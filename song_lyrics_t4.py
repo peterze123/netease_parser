@@ -44,8 +44,8 @@ def clean_lyric_json(data, artistname):
     
     return {}
 
-def lyric_insertion_query(cleaned_song_list, search_term, netease_profile):
-    
+def songlyric_insertion_query(cleaned_song_list, search_term, netease_profile):
+
     if cleaned_song_list == {}:
         return
     
@@ -114,10 +114,16 @@ if __name__ == '__main__':
     queried_list = query(db_params, "SELECT song_id, artist_name FROM song;")
     
     for i in queried_list:
-        raw_json = get_raw_lyric_data(api_host, i[0])
-        cleaned_json = clean_lyric_json(raw_json, i[1])
-        print(cleaned_json)
-        lyric_insertion_query(cleaned_json, i[0], api_host)
+        try:
+            raw_json = get_raw_lyric_data(api_host, i[0])
+            cleaned_json = clean_lyric_json(raw_json, i[1])
+            songlyric_insertion_query(cleaned_json, i[0], api_host)
+        
+        
+        except requests.exceptions.HTTPError as http_err:
+            raise Exception(f"HTTP error occurred: {http_err}")  # HTTP error
+        except requests.exceptions.RequestException as err:
+            raise Exception(f"Error fetching profile: {err}")  # Other request issues
         
     print("task 4 complete")
         

@@ -3,7 +3,7 @@
 import psycopg2
 import requests, json
 
-from misc import create_table, db_params, api_host, netease_profile, query
+from misc import clean_song_json, create_table, db_params, api_host, netease_profile, query
 
 def get_raw_song_data(parent_path, keyword, search_type):
     path = '/'.join([parent_path, "search?keywords=" + keyword + "&type=" + str(search_type)])
@@ -12,34 +12,6 @@ def get_raw_song_data(parent_path, keyword, search_type):
     result.raise_for_status()  # Will raise an HTTPError if the HTTP request returned an unsuccessful status code
     
     return json.dumps(result.json())
-
-def clean_song_json(data):
-    data = json.loads(data)
-
-    songs_info = []
-
-    if 'songs' in data['result']:
-        # Extracting information from each song
-        for song in data['result']['songs']:
-            songs_info.append({
-                'song_id': song['id'],
-                'song_name': song['name'],
-                'song_trans': song.get('alias', []),
-                'artist_name': ','.join([str(artist['name']) for artist in song['artists']]),
-                'artist_id': ','.join([str(artist['id']) for artist in song['artists']]),
-                'album_id': song['album']['id'],
-                'album_name': song['album']['name'],
-                'publish_time': song['album']['publishTime'],
-                'copyright_id': song['copyrightId'],
-                'status': song['status'],
-                'fee': song['fee'],
-                'mark': song.get('mark', 0),
-                'size': song['album'].get('size', 0),
-                'mvid': song.get('mvid', 0),
-                'json_string': data
-            })
-            
-    return songs_info
 
 def song_insertion_query(cleaned_song_list, search_term, netease_profile):
     
@@ -72,7 +44,6 @@ def song_insertion_query(cleaned_song_list, search_term, netease_profile):
     """
 
     # Prepare data for insertion (assuming the search_term and artist_search_user_profile are known)
-    search_term = search_term
     artist_search_user_profile = netease_profile
 
     # Iterate over the artists and insert each one
@@ -141,7 +112,7 @@ if __name__ == '__main__':
             for li in queried_list:
                 raw_json = get_raw_song_data(api_host, li[0], c[1])
                 cleaned_song_list = clean_song_json(raw_json)
-                song_insertion_query(cleaned_song_list, c[0], netease_profile)
+                song_insertion_query(cleaned_song_list, li[0], netease_profile)
             
         except requests.exceptions.HTTPError as http_err:
             raise Exception(f"HTTP error occurred: {http_err}")  # HTTP error

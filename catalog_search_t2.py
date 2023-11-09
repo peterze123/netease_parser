@@ -84,7 +84,7 @@ def catalog_clean(data: dict) -> list[dict]:
                 'mst': song.get('mst'),
                 'cp': song.get('cp'),
                 'no': song.get('no'),
-                'json_string': data
+                'json_string': song
             }
             # Add this song's info to our list
             extracted_data.append(song_info)

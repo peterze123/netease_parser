@@ -90,6 +90,33 @@ def get_id_from_netease_url(url):
             return key_value[1]
     return None
 
+def clean_song_json(data):
+    data = json.loads(data)
+
+    songs_info = []
+
+    if 'songs' in data['result'] and data['code'] == 200:
+        # Extracting information from each song
+        for song in data['result']['songs']:
+            songs_info.append({
+                'song_id': song['id'],
+                'song_name': song['name'],
+                'song_trans': song.get('alias', []),
+                'artist_name': ','.join([str(artist['name']) for artist in song['artists']]),
+                'artist_id': ','.join([str(artist['id']) for artist in song['artists']]),
+                'album_id': song['album']['id'],
+                'album_name': song['album']['name'],
+                'publish_time': song['album']['publishTime'],
+                'copyright_id': song['copyrightId'],
+                'status': song['status'],
+                'fee': song['fee'],
+                'mark': song.get('mark', 0),
+                'size': song['album'].get('size', 0),
+                'mvid': song.get('mvid', 0),
+                'json_string': data
+            })
+            
+    return songs_info
 
 if __name__ == "__main__":
     pass
