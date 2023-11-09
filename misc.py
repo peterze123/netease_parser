@@ -108,6 +108,8 @@ def clean_song_json(data):
                 'album_name': song['album']['name'],
                 'publish_time': song['album']['publishTime'],
                 'copyright_id': song['copyrightId'],
+                'duration' : song['duration'],
+                'alias' : ','.join([str(artist['alias']) for artist in song['artists']]),
                 'status': song['status'],
                 'fee': song['fee'],
                 'mark': song.get('mark', 0),

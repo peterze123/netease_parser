@@ -103,16 +103,25 @@ if __name__ == '__main__':
         """
     )
     
-    queried_list = query(db_params, "SELECT lyrics, songwriters FROM songlyric;")
+    queried_list = query(db_params, "SELECT lyrics, tlyrics, songwriters FROM songlyric;")
 
-    for lyrics, songwriters in queried_list:
+    for lyrics, tlyrics, songwriters in queried_list:
         try:
             cleaned_lyrics_list = clean_lyrics(lyrics)
+            cleaned_tlyrics_list = clean_lyrics(tlyrics)
+            
             # traverse through each line of the lyrics to search for result
             for line in cleaned_lyrics_list:
                 raw_song_data = get_raw_song_data(API_HOST, line)
                 cleaned_song_data = clean_song_json(raw_song_data)
                 lyric_insertion_query(cleaned_song_data, line, NETEASE_PROFILE)
+                
+            # traverse through each line of the tlyrics to search for result
+            for tline in cleaned_tlyrics_list:
+                raw_song_data = get_raw_song_data(API_HOST, tline)
+                cleaned_song_data = clean_song_json(raw_song_data)
+                lyric_insertion_query(cleaned_song_data, tline, NETEASE_PROFILE)
+                
             # after lyric search do song writers serach as well
             raw_song_data = get_raw_song_data(API_HOST, songwriters)
             cleaned_song_data = clean_song_json(raw_song_data)
@@ -123,4 +132,4 @@ if __name__ == '__main__':
         except requests.exceptions.RequestException as err:
             raise Exception(f"Error fetching profile: {err}")  # Other request issues
     
-    print("task 4 complete")
+    print("task 5 complete")

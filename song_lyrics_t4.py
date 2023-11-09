@@ -4,14 +4,14 @@ import re
 import psycopg2
 import requests, json
 
-from misc import create_table, db_params, api_host, netease_profile, query
+from misc import create_table, db_params, API_HOST, NETEASE_PROFILE, query
 
 def get_raw_lyric_data(parent_path, songid):
     path = '/'.join([parent_path, "lyric?id=" + str(songid)])
     
     result = requests.get(path)
     result.raise_for_status()  # Will raise an HTTPError if the HTTP request returned an unsuccessful status code
-    
+
     return json.dumps(result.json())
 
 def clean_lyric_json(data, artistname):
@@ -30,6 +30,7 @@ def clean_lyric_json(data, artistname):
         lyric_info['uptime'] = data.get('transUser', {}).get('uptime', 'Not found')
         lyric_info['version'] = data.get('lrc', {}).get('version', 'Not found')
         lyric_info['lyrics'] = data.get('lrc', {}).get('lyric', 'Not found')
+        lyric_info['tlyrics'] = data.get('tlyric', {}).get('lyric', 'Not found')
         lyric_info['json_string'] = data
 
         # Extract songwriters/artists
@@ -44,7 +45,7 @@ def clean_lyric_json(data, artistname):
     
     return {}
 
-def songlyric_insertion_query(cleaned_song_list, search_term, netease_profile):
+def songlyric_insertion_query(cleaned_song_list, search_term,  NETEASE_PROFILE):
 
     if cleaned_song_list == {}:
         return
@@ -63,14 +64,15 @@ def songlyric_insertion_query(cleaned_song_list, search_term, netease_profile):
         uptime,
         version,
         lyrics,
+        tlyrics,
         songwriters,
         json_string
-    ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+    ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
     ON CONFLICT (lyric_id) DO NOTHING;
     """
     
     search_term = search_term
-    artist_search_user_profile = netease_profile
+    artist_search_user_profile =  NETEASE_PROFILE
     
     cursor.execute(insert_query, (
             artist_search_user_profile,
@@ -81,6 +83,7 @@ def songlyric_insertion_query(cleaned_song_list, search_term, netease_profile):
             cleaned_song_list["uptime"],
             cleaned_song_list["version"],
             cleaned_song_list["lyrics"],
+            cleaned_song_list["tlyrics"],
             cleaned_song_list["songwriters"],
             json.dumps(cleaned_song_list['json_string'], ensure_ascii=False),
         ))
@@ -105,6 +108,7 @@ if __name__ == '__main__':
                 uptime TEXT,
                 version INTEGER,
                 lyrics TEXT,
+                tlyrics TEXT,
                 songwriters TEXT,
                 json_string TEXT
             );
@@ -115,10 +119,9 @@ if __name__ == '__main__':
     
     for i in queried_list:
         try:
-            raw_json = get_raw_lyric_data(api_host, i[0])
+            raw_json = get_raw_lyric_data(API_HOST, i[0])
             cleaned_json = clean_lyric_json(raw_json, i[1])
-            songlyric_insertion_query(cleaned_json, i[0], api_host)
-        
+            songlyric_insertion_query(cleaned_json, i[0], API_HOST)
         
         except requests.exceptions.HTTPError as http_err:
             raise Exception(f"HTTP error occurred: {http_err}")  # HTTP error
@@ -127,3 +130,4 @@ if __name__ == '__main__':
         
     print("task 4 complete")
         
+    
