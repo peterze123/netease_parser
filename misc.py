@@ -95,7 +95,7 @@ def clean_song_json(data):
 
     songs_info = []
 
-    if 'songs' in data['result'] and data['code'] == 200:
+    if 'songs' in data['code'] == 200 and data['result']:
         # Extracting information from each song
         for song in data['result']['songs']:
             songs_info.append({

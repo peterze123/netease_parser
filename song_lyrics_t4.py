@@ -39,9 +39,6 @@ def clean_lyric_json(data, artistname):
         lyric_info['songwriters'] = re.findall(r'作词 : (.*?)\\n', lyric_info['lyrics'])
         lyric_info['songwriters'] += re.findall(r'作曲 : (.*?)\\n', lyric_info['lyrics'])
         
-        if lyric_info['songwriters'] == []:
-            lyric_info['songwriters'] = artistname
-        
         return lyric_info
     elif pure_music:
         lyric_info['lyric_id'] = "pure_music_" + pure_music_sequence
@@ -52,7 +49,6 @@ def clean_lyric_json(data, artistname):
         lyric_info['lyrics'] = data.get('lrc', {}).get('lyric', 'Not found')
         lyric_info['tlyrics'] = data.get('tlyric', {}).get('lyric', 'Not found') if data.get('tlyric') else None
         lyric_info['json_string'] = data
-        lyric_info['songwriters'] = artistname
         
         pure_music_sequence += 1
         
