@@ -19,9 +19,10 @@ def clean_lyric_json(data, artistname):
     
     # Extracting fields
     lyric_id = data.get('transUser', {}).get('id', 'Not found')
+    pure_music = data['puremusic'] if 'puremusic' in data else None
     
     lyric_info = {
-        'lyric_id' : lyric_id
+        'lyric_id' : str(lyric_id)
     }
     
     if lyric_id != 'Not found':
@@ -30,7 +31,7 @@ def clean_lyric_json(data, artistname):
         lyric_info['uptime'] = data.get('transUser', {}).get('uptime', 'Not found')
         lyric_info['version'] = data.get('lrc', {}).get('version', 'Not found')
         lyric_info['lyrics'] = data.get('lrc', {}).get('lyric', 'Not found')
-        lyric_info['tlyrics'] = data.get('tlyric', {}).get('lyric', 'Not found')
+        lyric_info['tlyrics'] = data.get('tlyric', {}).get('lyric', 'Not found') if data.get('tlyric') else None
         lyric_info['json_string'] = data
 
         # Extract songwriters/artists
@@ -42,10 +43,24 @@ def clean_lyric_json(data, artistname):
             lyric_info['songwriters'] = artistname
         
         return lyric_info
+    elif pure_music:
+        lyric_info['lyric_id'] = "pure_music_" + pure_music_sequence
+        lyric_info['lyric_status'] = 'Not found'
+        lyric_info['user_id'] = 'Not found'
+        lyric_info['uptime'] = 'Not found'
+        lyric_info['version'] = data.get('lrc', {}).get('version', 'Not found')
+        lyric_info['lyrics'] = data.get('lrc', {}).get('lyric', 'Not found')
+        lyric_info['tlyrics'] = data.get('tlyric', {}).get('lyric', 'Not found') if data.get('tlyric') else None
+        lyric_info['json_string'] = data
+        lyric_info['songwriters'] = artistname
+        
+        pure_music_sequence += 1
+        
+        return lyric_info
     
     return {}
 
-def songlyric_insertion_query(cleaned_song_list, search_term,  NETEASE_PROFILE):
+def songlyric_insertion_query(cleaned_song_list, search_term, NETEASE_PROFILE):
 
     if cleaned_song_list == {}:
         return
@@ -97,12 +112,14 @@ def songlyric_insertion_query(cleaned_song_list, search_term,  NETEASE_PROFILE):
 
         
 if __name__ == '__main__':
+    pure_music_sequence = 0
+    
     create_table(db_params,
         """
             CREATE TABLE IF NOT EXISTS songlyric (
                 artist_search_user_profile TEXT,
                 search_term TEXT,
-                lyric_id BIGINT PRIMARY KEY,
+                lyric_id TEXT PRIMARY KEY,
                 lyric_status INTEGER,
                 user_id BIGINT,
                 uptime TEXT,

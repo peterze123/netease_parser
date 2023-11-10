@@ -3,7 +3,7 @@
 import psycopg2
 import requests, json
 
-from misc import clean_song_json, create_table, db_params, api_host, netease_profile, query
+from misc import clean_song_json, create_table, db_params, API_HOST, NETEASE_PROFILE, query
 
 def get_raw_song_data(parent_path, keyword, search_type):
     path = '/'.join([parent_path, "search?keywords=" + keyword + "&type=" + str(search_type)])
@@ -110,9 +110,9 @@ if __name__ == '__main__':
             queried_list = list(set(queried_list))
             
             for li in queried_list:
-                raw_json = get_raw_song_data(api_host, li[0], c[1])
+                raw_json = get_raw_song_data(API_HOST, li[0], c[1])
                 cleaned_song_list = clean_song_json(raw_json)
-                song_insertion_query(cleaned_song_list, li[0], netease_profile)
+                song_insertion_query(cleaned_song_list, li[0], NETEASE_PROFILE)
             
         except requests.exceptions.HTTPError as http_err:
             raise Exception(f"HTTP error occurred: {http_err}")  # HTTP error

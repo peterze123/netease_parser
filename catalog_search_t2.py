@@ -212,6 +212,6 @@ def get_all_artist_songs(search_term, artist_ids):
 
 if __name__ == '__main__':
     # search_term, artist_ids = query_artist_ids()
-    search_term, artist_ids = "Porter Robinson", [185871]
+    search_term, artist_ids = "Marshmello", [1060019]
     get_all_artist_songs(search_term, artist_ids)
     

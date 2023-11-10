@@ -11,11 +11,8 @@ import pandas as pd
 
 from misc import create_table, get_id_from_netease_url, db_params, API_HOST, NETEASE_PROFILE
 
-NETEASE_PROFILE = 'https://music.163.com/#/artist?id=185871'
-
 def get_artist_json_from_name(name, api_server) -> dict:
     """Get all artists for given name. Also includes similar rtists"""
-    # access the actual route
     path = '/'.join([api_server, 'search?keywords=' + name + '&type=100']) #type100 = search for artist
     
     result = requests.get(path)
@@ -72,10 +69,11 @@ def artist_json_clean(data) -> dict:
 
 def append_trans_artists(data_dict, api_server):
     """If any artists has a translation set request the artist page for this artist and add it to the artists field"""
+    trans_artists = []
     for artist in data_dict['artists']:
         if artist["trans"] is not None:
             try:
-                #request trans artist
+                # request trans artist
                 raw_json = get_artist_json_from_name(artist["trans"], api_server)
             except requests.exceptions.HTTPError as http_err:
                 raise Exception(f"HTTP error occurred: {http_err}")  # HTTP error
@@ -83,8 +81,9 @@ def append_trans_artists(data_dict, api_server):
                 raise Exception(f"Error fetching profile: {err}")  # Other request issues
             
             cleaned_dict = artist_json_clean(raw_json)
-            data_dict['artists'] += cleaned_dict['artists']
-            
+            trans_artists += cleaned_dict['artists']
+    
+    data_dict['artists'] += trans_artists
     # return json.dumps(output_data, indent=2,  ensure_ascii=False)
     return data_dict
 
@@ -169,11 +168,11 @@ def create_t1_table():
 def get_all_artists_for_name(profile) -> pd.DataFrame:
     create_t1_table()
     artist_name, raw_json = get_artist_json_from_link(profile, API_HOST)
-
+    
     # cleaned version
     cleaned_dict = artist_json_clean(raw_json)
     cleaned_dict = append_trans_artists(cleaned_dict, API_HOST)
-
+    
     artists_df = pd.DataFrame().from_dict(cleaned_dict["artists"])
     # print(artists_df)
     
