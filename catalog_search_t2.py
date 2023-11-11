@@ -121,7 +121,7 @@ def catalog_insertion_query(catalog_li, netease_profile=None, search_term=None):
         json_string = json.dumps(catalog['json_string'])
         
         audit_songs_args.append((song_id, song_name, artist_name, artist_id, fee, pop, mst, cp, no))
-        audit_json_args.append((0, song_id, json_string))
+        audit_json_args.append((-1, song_id, json_string))
         audit_finished_args.append((artist_id,))
         
     audit_songs_args_str = ','.join(cursor.mogrify("(%s, %s, %s, %s, %s, %s, %s, %s, %s, NOW())", x).decode('utf-8') for x in audit_songs_args)
@@ -192,7 +192,7 @@ def create_t2_tables():#
         )
 
 
-def get_all_artist_songs(artist_ids, skip_duplicates=False, search_term=None):
+def get_all_artist_songs(artist_ids, skip_duplicates=False, search_term=None, create_dataframe=True):
     # create_t2_tables()
     cleaned_catalog_list = []
     
@@ -208,20 +208,22 @@ def get_all_artist_songs(artist_ids, skip_duplicates=False, search_term=None):
 
             counter += 100
 
-    catalog_df = pd.DataFrame.from_dict(cleaned_catalog_list)
-    catalog_df = catalog_df.drop(columns=["json_string"])
-    
-
-    print(catalog_df["artist_name"])
-    # injection into postgres
-    catalog_insertion_query(cleaned_catalog_list, search_term=search_term)
+        if create_dataframe:
+            catalog_df = pd.DataFrame.from_dict(cleaned_catalog_list)
+            catalog_df = catalog_df.drop(columns=["json_string"])
+            print(catalog_df)
+            return catalog_df
+            
+        # injection into postgres
+        catalog_insertion_query(cleaned_catalog_list, search_term=search_term)
+        cleaned_catalog_list = []
+        print("artist_id:", artist_id)
     
     print("task 2 complete")
-    return catalog_df
     
 
 if __name__ == '__main__':
     # search_term, artist_ids = query_artist_ids()
-    search_term, artist_ids = "Marshmello", [1060019]
+    search_term, artist_ids = "Marshmello", [233338]
     get_all_artist_songs(artist_ids)
     
