@@ -4,7 +4,7 @@ import re
 import psycopg2
 import requests, json
 
-from misc import create_table, db_params, API_HOST, NETEASE_PROFILE, query
+from misc import create_table, DB_PARAMS, API_HOST, NETEASE_PROFILE, query
 
 def get_raw_lyric_data(parent_path, songid):
     path = '/'.join([parent_path, "lyric?id=" + str(songid)])
@@ -63,7 +63,7 @@ def songlyric_insertion_query(cleaned_song_list, search_term, NETEASE_PROFILE):
         return
     
     # Connect to the PostgreSQL database
-    conn = psycopg2.connect(**db_params)
+    conn = psycopg2.connect(**DB_PARAMS)
     cursor = conn.cursor()
     
     insert_query = """
@@ -111,7 +111,7 @@ def songlyric_insertion_query(cleaned_song_list, search_term, NETEASE_PROFILE):
 if __name__ == '__main__':
     pure_music_sequence = 0
     
-    create_table(db_params,
+    create_table(DB_PARAMS,
         """
             CREATE TABLE IF NOT EXISTS songlyric (
                 artist_search_user_profile TEXT,
@@ -129,7 +129,7 @@ if __name__ == '__main__':
         """
     )
     
-    queried_list = query(db_params, "SELECT song_id, artist_name FROM song;")
+    queried_list = query(DB_PARAMS, "SELECT song_id, artist_name FROM song;")
     
     for i in queried_list:
         try:

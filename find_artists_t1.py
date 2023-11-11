@@ -9,11 +9,11 @@ import psycopg2
 import requests, json
 import pandas as pd
 
-from misc import create_table, get_id_from_netease_url, db_params, API_HOST, NETEASE_PROFILE
+from misc import create_table, get_id_from_netease_url, DB_PARAMS, API_HOST, NETEASE_PROFILE
 
-def get_artist_json_from_name(name, api_server) -> dict:
+def get_artist_json_from_name(name) -> dict:
     """Get all artists for given name. Also includes similar rtists"""
-    path = '/'.join([api_server, 'search?keywords=' + name + '&type=100']) #type100 = search for artist
+    path = '/'.join([API_HOST, 'search?keywords=' + name + '&type=100']) #type100 = search for artist
     
     result = requests.get(path)
     result.raise_for_status()  # Will raise an HTTPError if the HTTP request returned an unsuccessful status code
@@ -21,11 +21,11 @@ def get_artist_json_from_name(name, api_server) -> dict:
     return result.json()
 
 
-def get_artist_json_from_link(profile_link, api_server):
+def get_artist_json_from_link(profile_link):
     """find clear artist id from the actual link string"""
     artist_id = get_id_from_netease_url(profile_link)
     # find the correct path
-    path = '/'.join([api_server, 'artists?id=' + artist_id])
+    path = '/'.join([API_HOST, 'artists?id=' + artist_id])
     # access the artist-name search route
     try:
         response = requests.get(path)
@@ -34,7 +34,7 @@ def get_artist_json_from_link(profile_link, api_server):
         # find the exact artist name
         artist_name = response.json()["artist"]["name"]
         
-        return artist_name, get_artist_json_from_name(artist_name, api_server)
+        return artist_name, get_artist_json_from_name(artist_name)
         
     except requests.exceptions.HTTPError as http_err:
         raise Exception(f"HTTP error occurred: {http_err}")  # HTTP error
@@ -74,7 +74,7 @@ def append_trans_artists(data_dict, api_server):
         if artist["trans"] is not None:
             try:
                 # request trans artist
-                raw_json = get_artist_json_from_name(artist["trans"], api_server)
+                raw_json = get_artist_json_from_name(artist["trans"])
             except requests.exceptions.HTTPError as http_err:
                 raise Exception(f"HTTP error occurred: {http_err}")  # HTTP error
             except requests.exceptions.RequestException as err:
@@ -90,7 +90,7 @@ def append_trans_artists(data_dict, api_server):
 
 def artists_insertion_query(data, artist_name, netease_profile, raw_json):
     # Connect to the PostgreSQL database
-    conn = psycopg2.connect(**db_params)
+    conn = psycopg2.connect(**DB_PARAMS)
     cursor = conn.cursor()
 
     # This is the SQL query template for inserting data
@@ -147,7 +147,7 @@ def artists_insertion_query(data, artist_name, netease_profile, raw_json):
 
 
 def create_t1_table():
-        create_table(db_params,
+        create_table(DB_PARAMS,
         """
             CREATE TABLE IF NOT EXISTS artist (
                 artist_search_user_profile TEXT,
@@ -166,8 +166,8 @@ def create_t1_table():
 
 
 def get_all_artists_for_name(profile) -> pd.DataFrame:
-    create_t1_table()
-    artist_name, raw_json = get_artist_json_from_link(profile, API_HOST)
+    # create_t1_table()
+    artist_name, raw_json = get_artist_json_from_link(profile)
     
     # cleaned version
     cleaned_dict = artist_json_clean(raw_json)

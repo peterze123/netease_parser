@@ -1,14 +1,13 @@
 """library for audit"""
 
 from lxml.html import fromstring
-from typing import Iterable
 import requests, json, psycopg2, datetime
 
 # Replace these variables with your database credentials
-db_params = {
-    'database': 'temp',
-    'user': 'temp',
-    'password': 'lsJKas2Sjk',
+DB_PARAMS = {
+    'database': 'netease_max',
+    'user': 'max',
+    'password': '123',
     'host': 'cma.cps7ukarrgmb.us-east-1.rds.amazonaws.com',
     'port': '5432'
 }
@@ -17,10 +16,10 @@ API_HOST = 'http://18.119.235.232:3000'
 NETEASE_PROFILE = 'https://music.163.com/#/artist?id=1060019'
 
 
-def create_table(db_params, query):
+def create_table(DB_PARAMS, query):
     """table creation functions"""
     # Establish a connection to the database
-    conn = psycopg2.connect(**db_params)
+    conn = psycopg2.connect(**DB_PARAMS)
     cursor = conn.cursor()
     
     # SQL statement to create a table if it does not exist
@@ -38,9 +37,9 @@ def create_table(db_params, query):
     # print("Table created successfully or already exists.")
     
     
-def query(db_params, query):
+def query(DB_PARAMS, query):
     """Establish a connection to the database"""
-    conn = psycopg2.connect(**db_params)
+    conn = psycopg2.connect(**DB_PARAMS)
     cursor = conn.cursor()
 
     # Execute the selection
@@ -78,7 +77,7 @@ def get_artist_name_from_xpath(profile_link):
         raise Exception(f"Profile parsing issue: {ve}")  # Parsing issues
 
 
-def get_song_details(song_ids: Iterable) -> dict:
+def get_song_details(song_ids: list) -> dict:
     song_ids_string = ",".join(song_ids)
     url_song_api = f"{API_HOST}/song/detail?ids={song_ids_string}"
     response = requests.get(url_song_api)
@@ -126,6 +125,7 @@ def get_id_from_netease_url(url):
             return key_value[1]
     return None
 
+
 def clean_song_json(data):
     data = json.loads(data)
 
@@ -155,6 +155,7 @@ def clean_song_json(data):
             })
             
     return songs_info
+
 
 if __name__ == "__main__":
     # get_comments(347230)

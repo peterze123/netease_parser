@@ -3,8 +3,7 @@
 import psycopg2
 import requests, json
 
-from misc import create_table, db_params, API_HOST, NETEASE_PROFILE, query
-from misc import clean_song_json, create_table, db_params, API_HOST, NETEASE_PROFILE, query
+from misc import clean_song_json, create_table, DB_PARAMS, API_HOST, NETEASE_PROFILE, query
 
 def get_raw_song_data(parent_path, keyword, search_type):
     path = '/'.join([parent_path, "search?keywords=" + keyword + "&type=" + str(search_type)])
@@ -17,7 +16,7 @@ def get_raw_song_data(parent_path, keyword, search_type):
 def song_insertion_query(cleaned_song_list, search_term, netease_profile):
     
     # Connect to the PostgreSQL database
-    conn = psycopg2.connect(**db_params)
+    conn = psycopg2.connect(**DB_PARAMS)
     cursor = conn.cursor()
 
     # This is the SQL query template for inserting data
@@ -78,7 +77,7 @@ def song_insertion_query(cleaned_song_list, search_term, netease_profile):
     conn.close()
 
 if __name__ == '__main__':
-    create_table(db_params,
+    create_table(DB_PARAMS,
         """
             CREATE TABLE IF NOT EXISTS song (
                 artist_search_user_profile TEXT,
@@ -107,7 +106,7 @@ if __name__ == '__main__':
     # query from database
     for c in catalog_queries: 
         try:
-            queried_list = query(db_params, "SELECT " + c[0] + " FROM catalog;")
+            queried_list = query(DB_PARAMS, "SELECT " + c[0] + " FROM catalog;")
             queried_list = list(set(queried_list))
             
             for li in queried_list:

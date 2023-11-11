@@ -4,16 +4,16 @@ import pandas as pd
 import psycopg2
 import requests, json
 
-from misc import create_table, db_params, API_HOST, NETEASE_PROFILE
+from misc import create_table, DB_PARAMS, API_HOST, NETEASE_PROFILE
 
 
 def query_artist_ids():
     # Connect to the PostgreSQL database
-    conn = psycopg2.connect(**db_params)
+    conn = psycopg2.connect(**DB_PARAMS)
     cursor = conn.cursor()
     
     # SQL query to select all artist IDs
-    select_query = "SELECT artist_id, search_term  FROM Artist;"
+    select_query = "SELECT artist_id, search_term FROM artist;"
     
     try:
         # Execute the SQL query
@@ -82,109 +82,118 @@ def catalog_clean(data: dict) -> list[dict]:
                 'fee': song.get('fee'),
                 'pop': song.get('pop'),
                 'mst': song.get('mst'),
-                'cp': song.get('cp'),
+                'copyright_id': song.get('cp'),
                 'no': song.get('no'),
                 "album_id": song["al"]["id"],
                 'json_string': song
             }
+            
             # Add this song's info to our list
             extracted_data.append(song_info)
             
     return extracted_data
     
-    
-def catalog_insertion_query(catalog_li, search_term, netease_profile):
+
+def catalog_insertion_query(catalog_li, netease_profile=None, search_term=None):
     # Connect to the PostgreSQL database
-    conn = psycopg2.connect(**db_params)
+    conn = psycopg2.connect(**DB_PARAMS)
     cursor = conn.cursor()
-
-    # This is the SQL query template for inserting data
-    insert_query = """
-    INSERT INTO catalog (
-        artist_search_user_profile,
-        search_term,
-        song_id ,
-        song_name,
-        tns,
-        artist_name,
-        artist_id,
-        fee,
-        pop,
-        mst,
-        cp,
-        no,
-        json_string
-    ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
-    ON CONFLICT (song_id) DO NOTHING;
-    """
-
+    
+    audit_songs_args = []
+    audit_json_args = []
+    audit_finished_args = []
+    
     # Prepare data for insertion (assuming the search_term and artist_search_user_profile are known)
     search_term = search_term
-    artist_search_user_profile = netease_profile
 
     # Iterate over the artists and insert each one
     for catalog in catalog_li:
         song_id = catalog['song_id']
         song_name = catalog['song_name']
-        tns = catalog['tns']
+        # tns = catalog['tns']
         artist_name = catalog['artist_name']
         artist_id = catalog['artist_id']
         fee = catalog['fee']
         pop = catalog['pop']
         mst = catalog['mst']
-        cp = catalog['cp']
+        cp = catalog['copyright_id']
         no = catalog['no']
-        json_string = catalog['json_string']
+        json_string = json.dumps(catalog['json_string'])
+        
+        audit_songs_args.append((song_id, song_name, artist_name, artist_id, fee, pop, mst, cp, no))
+        audit_json_args.append((0, song_id, json_string))
+        audit_finished_args.append((artist_id,))
+        
+    audit_songs_args_str = ','.join(cursor.mogrify("(%s, %s, %s, %s, %s, %s, %s, %s, %s, NOW())", x).decode('utf-8') for x in audit_songs_args)
+    audit_json_args_str = ','.join(cursor.mogrify("(%s, %s, %s)", x).decode('utf-8') for x in audit_json_args)
+    audit_finished_str = ','.join(cursor.mogrify("(%s)", x).decode('utf-8') for x in audit_finished_args)
+        
+    try:
+        cursor.execute(f"""
+            INSERT INTO audit_songs (song_id, song_name, artist_name, artist_id, fee, popularity,
+                mst, copyright_id, no, scrape_time 
+            ) VALUES {audit_songs_args_str} ON CONFLICT (song_id) DO NOTHING;""")
+        conn.commit()
+        
+        cursor.execute(f"""
+            INSERT INTO audit_json (artist_id, song_id, api_text)
+            VALUES {audit_json_args_str} ON CONFLICT DO NOTHING;""")
+        conn.commit()
+        
+        cursor.execute(f"""
+            update audit_artists_to_scrape as t set
+            finished = True
+            from (values
+                {audit_finished_str}
+            ) as c(artist_id) 
+            where c.artist_id = t.artist_id;
+        """)
+        conn.commit()
 
-        # Execute the insert query with the data
-        cursor.execute(insert_query, (
-            artist_search_user_profile,
-            search_term,
-            song_id,
-            song_name,
-            tns,
-            artist_name,
-            artist_id,
-            fee,
-            pop,
-            mst,
-            cp,
-            no,
-            json.dumps(json_string, ensure_ascii=False),
-        ))
-
-    # Commit the transaction
-    conn.commit()
+    except psycopg2.DatabaseError as error:
+        print("error: ", error)
+        conn.rollback()
 
     # Close the cursor and the connection
     cursor.close()
     conn.close()
 
     
-def create_t2_table():#
-    create_table(db_params,
+def create_t2_tables():#
+    create_table(DB_PARAMS,
         """
-            CREATE TABLE IF NOT EXISTS catalog (
-                artist_search_user_profile TEXT,
+            CREATE TABLE IF NOT EXISTS audit_songs (
                 search_term TEXT,
                 song_id BIGINT PRIMARY KEY,
                 song_name TEXT,
                 tns TEXT,
                 artist_name TEXT,
                 artist_id BIGINT,
-                fee INTEGER,
-                pop INTEGER,
+                                fee INTEGER,
+                popularity INTEGER,
                 mst INTEGER,
-                cp BIGINT,
+                copyright_id BIGINT,
                 no INTEGER,
-                json_string TEXT
+                scrape_time TIMESTAMP
             );
         """
-    )
+        )
+        
+    #The id that is not used should be -1
+    create_table(DB_PARAMS,
+        """
+            CREATE TABLE IF NOT EXISTS audit_json (
+                artist_id bigint NOT NULL,
+                song_id bigint NOT NULL,
+                api_text jsonb,
+                CONSTRAINT audit_json_pkey PRIMARY KEY (artist_id, song_id)
+            );
+        """
+        )
 
 
-def get_all_artist_songs(search_term, artist_ids, skip_duplicates=False):
-    create_t2_table()
+def get_all_artist_songs(artist_ids, skip_duplicates=False, search_term=None):
+    # create_t2_tables()
     cleaned_catalog_list = []
     
     for artist_id in artist_ids:
@@ -201,9 +210,11 @@ def get_all_artist_songs(search_term, artist_ids, skip_duplicates=False):
 
     catalog_df = pd.DataFrame.from_dict(cleaned_catalog_list)
     catalog_df = catalog_df.drop(columns=["json_string"])
+    
 
+    print(catalog_df["artist_name"])
     # injection into postgres
-    # catalog_insertion_query(cleaned_catalog_list, search_term, NETEASE_PROFILE)
+    catalog_insertion_query(cleaned_catalog_list, search_term=search_term)
     
     print("task 2 complete")
     return catalog_df
@@ -212,5 +223,5 @@ def get_all_artist_songs(search_term, artist_ids, skip_duplicates=False):
 if __name__ == '__main__':
     # search_term, artist_ids = query_artist_ids()
     search_term, artist_ids = "Marshmello", [1060019]
-    get_all_artist_songs(search_term, artist_ids)
+    get_all_artist_songs(artist_ids)
     

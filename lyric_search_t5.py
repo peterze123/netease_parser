@@ -4,7 +4,7 @@ import re
 import psycopg2
 import requests, json
 
-from misc import create_table, db_params, API_HOST,NETEASE_PROFILE, query, clean_song_json
+from misc import create_table, DB_PARAMS, API_HOST,NETEASE_PROFILE, query, clean_song_json
 
 def clean_lyrics(raw_lyrics):
     # Regular expression to match timestamps and lines containing '作词' or '作曲'
@@ -29,7 +29,7 @@ def get_raw_song_data(parent_path, search_term):
 def lyric_insertion_query(cleaned_song_list, search_term, netease_profile):
     
     # Connect to the PostgreSQL database
-    conn = psycopg2.connect(**db_params)
+    conn = psycopg2.connect(**DB_PARAMS)
     cursor = conn.cursor()
 
     # This is the SQL query template for inserting data
@@ -83,7 +83,7 @@ def lyric_insertion_query(cleaned_song_list, search_term, netease_profile):
     conn.close()
 
 if __name__ == '__main__':
-    create_table(db_params,
+    create_table(DB_PARAMS,
         """
             CREATE TABLE IF NOT EXISTS lyric (
                 artist_search_user_profile TEXT,
@@ -103,7 +103,7 @@ if __name__ == '__main__':
         """
     )
     
-    queried_list = query(db_params, "SELECT lyrics, tlyrics, songwriters FROM songlyric;")
+    queried_list = query(DB_PARAMS, "SELECT lyrics, tlyrics, songwriters FROM songlyric;")
 
     for lyrics, tlyrics, songwriters in queried_list:
         try:
