@@ -49,6 +49,7 @@ def clean_lyric_json(data, artistname):
         lyric_info['lyrics'] = data.get('lrc', {}).get('lyric', 'Not found')
         lyric_info['tlyrics'] = data.get('tlyric', {}).get('lyric', 'Not found') if data.get('tlyric') else None
         lyric_info['json_string'] = data
+        lyric_info['songwriters'] = []
         
         pure_music_sequence += 1
         
