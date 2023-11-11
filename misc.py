@@ -1,8 +1,8 @@
 """library for audit"""
 
 from lxml.html import fromstring
-import requests, json, psycopg2
 from typing import Iterable
+import requests, json, psycopg2, datetime
 
 # Replace these variables with your database credentials
 db_params = {
@@ -14,7 +14,7 @@ db_params = {
 }
 
 API_HOST = 'http://18.119.235.232:3000'
-NETEASE_PROFILE = 'https://music.163.com/#/artist?id=185871'
+NETEASE_PROFILE = 'https://music.163.com/#/artist?id=1060019'
 
 
 def create_table(db_params, query):
@@ -126,6 +126,35 @@ def get_id_from_netease_url(url):
             return key_value[1]
     return None
 
+def clean_song_json(data):
+    data = json.loads(data)
+
+    songs_info = []
+
+    if 'songs' in data['code'] == 200 and data['result']:
+        # Extracting information from each song
+        for song in data['result']['songs']:
+            songs_info.append({
+                'song_id': song['id'],
+                'song_name': song['name'],
+                'song_trans': song.get('alias', []),
+                'artist_name': ','.join([str(artist['name']) for artist in song['artists']]),
+                'artist_id': ','.join([str(artist['id']) for artist in song['artists']]),
+                'album_id': song['album']['id'],
+                'album_name': song['album']['name'],
+                'publish_time': datetime.datetime.utcfromtimestamp(song['album']['publishTime']/1000).strftime('%Y-%m-%dT%H:%M:%SZ'),
+                'copyright_id': song['copyrightId'],
+                'duration' : song['duration'],
+                'alias' : ','.join([str(artist['alias']) for artist in song['artists']]),
+                'status': song['status'],
+                'fee': song['fee'],
+                'mark': song.get('mark', 0),
+                'size': song['album'].get('size', 0),
+                'mvid': song.get('mvid', 0),
+                'json_string': data
+            })
+            
+    return songs_info
 
 if __name__ == "__main__":
     # get_comments(347230)

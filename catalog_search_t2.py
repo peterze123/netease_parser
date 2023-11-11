@@ -84,8 +84,12 @@ def catalog_clean(data: dict) -> list[dict]:
                 'mst': song.get('mst'),
                 'cp': song.get('cp'),
                 'no': song.get('no'),
+<<<<<<< HEAD
                 "album_id": song["al"]["id"],
                 'json_string': data
+=======
+                'json_string': song
+>>>>>>> branch 'netease_api_scraper' of https://git-codecommit.us-east-1.amazonaws.com/v1/repos/cma_libs
             }
             # Add this song's info to our list
             extracted_data.append(song_info)
@@ -211,7 +215,11 @@ def get_all_artist_songs(search_term, artist_ids, skip_duplicates=False):
 
 if __name__ == '__main__':
     # search_term, artist_ids = query_artist_ids()
+<<<<<<< HEAD
     search_term, artist_ids = "Porter Robinson", [185871]
     # print(get_song_size(artist_ids[0], API_HOST))
+=======
+    search_term, artist_ids = "Marshmello", [1060019]
+>>>>>>> branch 'netease_api_scraper' of https://git-codecommit.us-east-1.amazonaws.com/v1/repos/cma_libs
     get_all_artist_songs(search_term, artist_ids)
     
