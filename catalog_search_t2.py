@@ -183,7 +183,7 @@ def create_t2_table():#
     )
 
 
-def get_all_artist_songs(search_term, artist_ids):
+def get_all_artist_songs(search_term, artist_ids, skip_duplicates=False):
     create_t2_table()
     cleaned_catalog_list = []
     
@@ -198,8 +198,7 @@ def get_all_artist_songs(search_term, artist_ids):
             cleaned_catalog_list += catalog_clean(data_dict)
 
             counter += 100
-            
-    
+
     catalog_df = pd.DataFrame.from_dict(cleaned_catalog_list)
     catalog_df = catalog_df.drop(columns=["json_string"])
 
@@ -213,5 +212,6 @@ def get_all_artist_songs(search_term, artist_ids):
 if __name__ == '__main__':
     # search_term, artist_ids = query_artist_ids()
     search_term, artist_ids = "Porter Robinson", [185871]
+    # print(get_song_size(artist_ids[0], API_HOST))
     get_all_artist_songs(search_term, artist_ids)
     

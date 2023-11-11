@@ -95,12 +95,13 @@ def get_album_details(album_id) -> dict:
     return response.json()
 
 
-def get_follower_count(artist_id) -> int:
+def get_follower_count(artist_id) -> dict:
+    """follower == fans"""
     url_album_api = f"{API_HOST}/artist/follow/count?id={artist_id}"
     response = requests.get(url_album_api)
     response.raise_for_status()
     
-    return response.json()["data"]["fansCnt"]
+    return response.json()
 
 
 def get_comments(song_id, limit=1):
@@ -127,6 +128,7 @@ def get_id_from_netease_url(url):
 
 
 if __name__ == "__main__":
-    get_comments(347230)
+    # get_comments(347230)
+    print(get_follower_count(11127))
     pass
     

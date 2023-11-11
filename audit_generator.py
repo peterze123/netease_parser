@@ -10,14 +10,16 @@ import datetime
 from tqdm import tqdm
 from misc import get_album_details, get_song_details, get_comments, get_follower_count
 from find_artists_t1 import get_all_artists_for_name
-from catalog_search_t2 import get_all_artist_songs
+from catalog_search_t2 import get_all_artist_songs, get_song_size
 
 import warnings
 from pandas.errors import SettingWithCopyWarning
 
 
 ARTIST_NAME = "Mac Miller"
+# ARTIST_NAME = "Porter Robinson"
 ARTIST_ID = 39884
+# ARTIST_ID = 185871
 
 API_HOST = 'http://18.119.235.232:3000'
 NETEASE_PROFILE = 'https://music.163.com/#/artist?id=185871'
@@ -56,19 +58,23 @@ class AuditGenerator():
     
     
     def get_all_artist_songs(self) -> None:
-        songs = get_all_artist_songs(ARTIST_NAME, [self.artist_id])[:5]
-        # songs = get_all_artist_songs(ARTIST_NAME, [self.artist_id])
+        # songs = get_all_artist_songs(ARTIST_NAME, [self.artist_id])[:5] #for testing
+        songs = get_all_artist_songs(ARTIST_NAME, [self.artist_id])
         
         self.audit_df = pd.DataFrame.from_dict(songs)
         self.audit_df = self.audit_df.rename(columns={"cp":"copyright_id", "pop": "popularity"})
-        self.audit_df = self.audit_df.drop(columns = ["tns", "mst", "no"])
+        self.audit_df = self.audit_df.drop(columns = ["tns", "mst", "no", "artist_name"])
         self.audit_df = self.audit_df.reset_index()
+        
+        self.audit_df = self.audit_df.drop_duplicates(subset=['song_id'])
         
         self.audit_df["song_url"] = self.audit_df.apply(lambda x: "https://music.163.com/#/song?id=" + str(x["song_id"]), axis=1)
         self.audit_df["scrape_time"] = datetime.datetime.now().strftime('%Y-%m-%d')
         
     
     def seperate_similar_fake_artists(self, all_artists_df):
+        #TODO: functionis not correct anymore
+        
         # self.duplicates_df = all_artists_df[all_artists_df["artist_id"] != self.artist_id]
         self.duplicates_df = all_artists_df.copy()
         
@@ -76,6 +82,12 @@ class AuditGenerator():
         self.duplicates_df["Type"] = ""
         self.duplicates_df["Notes"] = ""
         self.duplicates_df["Profile Link"] = "https://music.163.com/#/artist?id=" + self.duplicates_df["artist_id"].astype(str)
+        
+        #add music size 
+        for artist_id in self.duplicates_df["artist_id"].to_list():
+            path, music_size = get_song_size(artist_id, API_HOST)
+            self.duplicates_df.loc[self.duplicates_df.artist_id == artist_id, 'music_size'] = music_size
+        
         
         self.duplicates_df = self.duplicates_df.rename(columns={"artist_name": "Profile Name"})
         self.duplicates_df = self.duplicates_df.drop(columns=["albumsize", "mvsize", "trans"])
@@ -107,7 +119,7 @@ class AuditGenerator():
     def add_folower_count(self) -> None:
         for artist_id in self.duplicates_df["artist_id"].to_list():
             follower_count = get_follower_count(artist_id)
-            self.duplicates_df.loc[self.all_artists_df.artist_id == artist_id, 'follower_count'] = follower_count
+            self.duplicates_df.loc[self.duplicates_df.artist_id == artist_id, 'follower_count'] = follower_count
             
         self.duplicates_df = self.duplicates_df.drop(columns=["artist_id"])
             
@@ -123,12 +135,12 @@ class AuditGenerator():
             album_dict = get_album_details(album_id)
             albums_dict[album_id]["album_name"] = album_dict["album"]["name"]
             albums_dict[album_id]["company"] = album_dict["album"]["company"]
-            albums_dict[album_id]["realease_date"] = self.convert_time_to_date(album_dict["album"]["publishTime"]/1000)
+            albums_dict[album_id]["release_date"] = self.convert_time_to_date(album_dict["album"]["publishTime"]/1000)
 
         for album_id in album_set:
             self.audit_df.loc[self.audit_df.album_id == album_id, 'album_name'] = albums_dict[album_id]["album_name"]
             self.audit_df.loc[self.audit_df.album_id == album_id, 'company'] = albums_dict[album_id]["company"]
-            self.audit_df.loc[self.audit_df.album_id == album_id, 'realease_date'] = albums_dict[album_id]["realease_date"]
+            self.audit_df.loc[self.audit_df.album_id == album_id, 'release_date'] = albums_dict[album_id]["release_date"]
             
     
     def add_artists_and_comments_to_songs(self) -> None:
@@ -160,6 +172,7 @@ class AuditGenerator():
         
     
     def estimated_royalties(self, comment_count):
+        """Implement same pattern, add 5000 comments, then 1 to 1 value to get min amount, then add $10,000 to higher range"""
         if comment_count == "N/A" or comment_count < 1000:
             return "N/A"
 
@@ -186,15 +199,21 @@ class AuditGenerator():
             return "$2500 - $5000+" 
         elif comment_count >= 1000:
             return "$1000+"
-            """Implement same pattern, add 5000 comments, then 1 to 1 value to get min amount, then add $10,000 to higher range"""
+        
             
         return f"${min_royalty_estimate} - ${max_royalty_estimate}"
         
         
     def save_audit_as_xlsx(self):
-        writer = pd.ExcelWriter("artist_audit.xlsx", engine = 'xlsxwriter')
-        self.audit_df.to_excel(writer, index=True, sheet_name = "NetEase Raw")
-        self.duplicates_df.to_excel(writer, index=True, sheet_name = "Profile Search")
+        writer = pd.ExcelWriter(f"{ARTIST_NAME} - CMA Profile Audit.xlsx", engine = 'xlsxwriter')
+        columns_without_copyright_id = self.audit_df.columns.to_list()
+        columns_without_copyright_id.remove("copyright_color")
+        clean_columns = ["artists", "song_name", "album_name", "company", "release_date", "comment_count", "royalties", "song_url"]
+        print(self.audit_df.columns.to_list())
+        
+        self.audit_df.to_excel(writer, index=False, sheet_name = "NetEase Raw", columns=columns_without_copyright_id)
+        self.audit_df.to_excel(writer, index=False, sheet_name = "Netease Clean", columns=clean_columns)
+        self.duplicates_df.to_excel(writer, index=False, sheet_name = "Profile Search")
         writer.close()
         
         
@@ -245,7 +264,6 @@ class AuditGenerator():
         self.audit_df["royalties"] = self.audit_df.apply(lambda x: self.estimated_royalties(x["comment_count"]), axis=1)
         self.coloring_rows()
         self.save_audit_as_xlsx()
-        # self.audit_df = self.audit_df.drop(columns=["copyright_color"])
         self.upload_audit_to_s3()
         
         print(self.audit_df)
@@ -254,7 +272,6 @@ class AuditGenerator():
 if __name__ == "__main__":
     start_time = time.time()
     audit_generator = AuditGenerator(ARTIST_NAME)
-    # audit_generator.get_all_artist_songs()
     audit_generator.generate_audit()
     
     print("time:", time.time() - start_time)
