@@ -1,4 +1,4 @@
-"""Saves an audit as xlsx file for a given artist name on S3"""
+"""Run audit for a single given artist_id and saves resultsd as xlsx file"""
 
 import pandas as pd
 import boto3
@@ -16,9 +16,9 @@ import warnings
 from pandas.errors import SettingWithCopyWarning
 
 
-ARTIST_NAME = "Mac Miller"
+ARTIST_NAME = "Two Steps From Hell"
 # ARTIST_NAME = "Porter Robinson"
-ARTIST_ID = 39884
+ARTIST_ID = 102714
 # ARTIST_ID = 185871
 
 API_HOST = 'http://18.119.235.232:3000'
@@ -58,8 +58,8 @@ class AuditGenerator():
     
     
     def get_all_artist_songs(self) -> None:
-        # songs = get_all_artist_songs(ARTIST_NAME, [self.artist_id])[:5] #for testing
-        songs = get_all_artist_songs(ARTIST_NAME, [self.artist_id])
+        # songs = get_all_artist_songs([self.artist_id])[:5] #for testing
+        songs = get_all_artist_songs([self.artist_id])
         
         self.audit_df = pd.DataFrame.from_dict(songs)
         self.audit_df = self.audit_df.rename(columns={"cp":"copyright_id", "pop": "popularity"})
@@ -126,21 +126,28 @@ class AuditGenerator():
     
     def add_album_details(self) -> None:
         album_set = set(self.audit_df["album_id"].to_list()) - {0} 
-        
+
         albums_dict = {}
         for album_id in tqdm(album_set):
             if album_id not in albums_dict:
                 albums_dict[album_id] = {}
                 
-            album_dict = get_album_details(album_id)
-            albums_dict[album_id]["album_name"] = album_dict["album"]["name"]
-            albums_dict[album_id]["company"] = album_dict["album"]["company"]
-            albums_dict[album_id]["release_date"] = self.convert_time_to_date(album_dict["album"]["publishTime"]/1000)
+            try:
+                album_dict = get_album_details(album_id)
+                albums_dict[album_id]["album_name"] = album_dict["album"]["name"]
+                albums_dict[album_id]["company"] = album_dict["album"]["company"]
+                albums_dict[album_id]["release_date"] = self.convert_time_to_date(album_dict["album"]["publishTime"]/1000)
+            except Exception as e:
+                print("no album details", e)
+                albums_dict = {"album_name": "N/A", "company": "N/A", "release_date": None}
 
         for album_id in album_set:
-            self.audit_df.loc[self.audit_df.album_id == album_id, 'album_name'] = albums_dict[album_id]["album_name"]
-            self.audit_df.loc[self.audit_df.album_id == album_id, 'company'] = albums_dict[album_id]["company"]
-            self.audit_df.loc[self.audit_df.album_id == album_id, 'release_date'] = albums_dict[album_id]["release_date"]
+            try:
+                self.audit_df.loc[self.audit_df.album_id == album_id, 'album_name'] = albums_dict[album_id]["album_name"]
+                self.audit_df.loc[self.audit_df.album_id == album_id, 'company'] = albums_dict[album_id]["company"]
+                self.audit_df.loc[self.audit_df.album_id == album_id, 'release_date'] = albums_dict[album_id]["release_date"]
+            except:
+                pass
             
     
     def add_artists_and_comments_to_songs(self) -> None:

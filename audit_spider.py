@@ -1,4 +1,4 @@
-"""Read songs with pop > 5 from db, run audit script and save results to db"""
+"""Get audit data for songs with score > 5 and save to db"""
 
 from catalog_search_t2 import get_all_artist_songs
 import psycopg2

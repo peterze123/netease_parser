@@ -36,7 +36,7 @@ def get_song_size(artist_id, api_url):
     try:
         # make a request to the songs route to find total songs
         path = '/'.join([api_url, 'artist/songs?id=' + str(artist_id)])
-        
+        print(path)
         result = requests.get(path)
         result.raise_for_status()  # Will raise an HTTPError if the HTTP request returned an unsuccessful status code
         
@@ -52,7 +52,6 @@ def get_catalog_dict(offset, parent_path) -> dict:
     try:
         # make a request to the songs route to find total songs
         path = '&'.join([parent_path, 'offset=' + str(offset) + '&limit=100'])
-        
         result = requests.get(path)
         result.raise_for_status()  # Will raise an HTTPError if the HTTP request returned an unsuccessful status code
         
@@ -215,7 +214,7 @@ def get_all_artist_songs(artist_ids, skip_duplicates=False, search_term=None, cr
             return catalog_df
             
         # injection into postgres
-        catalog_insertion_query(cleaned_catalog_list, search_term=search_term)
+        # catalog_insertion_query(cleaned_catalog_list, search_term=search_term)
         cleaned_catalog_list = []
         print("artist_id:", artist_id)
     

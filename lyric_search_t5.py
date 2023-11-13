@@ -18,6 +18,7 @@ def clean_lyrics(raw_lyrics):
     
     return list(set(lyrics_list[1:]))
 
+
 def get_raw_song_data(parent_path, search_term):
     path = '/'.join([parent_path, "search?keywords=" + search_term + "&type=1006"])
     
@@ -25,6 +26,7 @@ def get_raw_song_data(parent_path, search_term):
     result.raise_for_status()  # Will raise an HTTPError if the HTTP request returned an unsuccessful status code
     
     return json.dumps(result.json())
+
 
 def lyric_insertion_query(cleaned_song_list, search_term, netease_profile):
     
@@ -81,6 +83,7 @@ def lyric_insertion_query(cleaned_song_list, search_term, netease_profile):
     # Close the cursor and the connection
     cursor.close()
     conn.close()
+
 
 if __name__ == '__main__':
     create_table(DB_PARAMS,
