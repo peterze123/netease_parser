@@ -86,9 +86,8 @@ def songlyric_insertion_query(lyric_dicts: list):
         audit_json_args.append((song_id, api_text))
         audit_finished_args.append((song_id,))
     
-    
-    audit_lyrics_args_str = ','.join(cursor.mogrify("(%s, %s, %s, %s, %s, %s, %s, %s, %s, NOW())", x).decode('utf-8') for x in audit_lyrics_args)
-    audit_json_args_str = ','.join(cursor.mogrify("(%s, %s)", x).decode('utf-8') for x in audit_json_args)
+    audit_lyrics_args_str = ','.join(cursor.mogrify("(%s, %s, %s, %s, %s, %s, %s, %s, %s, NOW())", x).decode('utf-8', errors="replace").replace("\x00", "\uFFFD") for x in audit_lyrics_args)
+    audit_json_args_str = ','.join(cursor.mogrify("(%s, %s)", x).decode('utf-8', errors="replace").replace("\x00", "\uFFFD") for x in audit_json_args)
     audit_finished_str = ','.join(cursor.mogrify("(%s)", x).decode('utf-8') for x in audit_finished_args)
 
     try:
